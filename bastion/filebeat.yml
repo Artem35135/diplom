@@ -1,0 +1,51 @@
+---
+- name: Установка Filebeat и настройка отправки логов nginx
+  hosts: webservers
+  become: yes
+  tasks:
+
+    - name: Добавление репозитория Elastic от Yandex Mirror
+      apt_repository:
+        repo: "deb [trusted=yes] https://mirror.yandex.ru/mirrors/elastic/7/ stable main"
+        filename: "elastic-7.x"
+        state: present
+
+    - name: Обновление списка пакетов
+      apt:
+        update_cache: yes
+
+    - name: Установка Filebeat
+      apt:
+        name: filebeat
+        state: present
+
+    - name: Настройка Filebeat для отправки nginx логов
+      copy:
+        dest: /etc/filebeat/filebeat.yml
+        content: |
+          filebeat.inputs:
+            - type: log
+              enabled: true
+              paths:
+                - /var/log/nginx/access.log
+                - /var/log/nginx/error.log
+              fields:
+                service: nginx
+              fields_under_root: true
+
+          output.elasticsearch:
+            hosts: ["http://elastic.ru-central1.internal:9200"]
+            username: "elastic"
+            password: "lup3RcsOaHaSwoJ1zD44"
+            indices:
+              - index: "nginx-access-%{+yyyy.MM.dd}"
+              - index: "nginx-error-%{+yyyy.MM.dd}"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Включение и запуск Filebeat
+      systemd:
+        name: filebeat
+        enabled: yes
+        state: started

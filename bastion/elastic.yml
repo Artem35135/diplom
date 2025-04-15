@@ -1,0 +1,59 @@
+- name: Deploy docker-compose on elastic
+  hosts: elastic
+  become: true
+  tasks:
+
+    - name: Copy docker-compose.yml
+      copy:
+        src: ./docker-compose.yml
+        dest: /home/user/docker-compose.yml
+        owner: user
+        group: user
+        mode: '0644'
+
+    - name: Run docker-compose up
+      command: docker-compose -f /home/user/docker-compose.yml up -d
+      args:
+        chdir: /home/user
+
+    # Create pipeline
+
+    - name: Wait for Elasticsearch to start (30 sec)
+      wait_for:
+        port: 9200
+        delay: 10
+        timeout: 30
+
+    - name: Create Nginx logs pipeline in Elasticsearch
+      uri:
+        url: "http://localhost:9200/_ingest/pipeline/filebeat-7.17.28-nginx-pipeline"
+        method: PUT
+        user: "elastic"
+        password: "lup3RcsOaHaSwoJ1zD44"
+        body_format: json
+        body: |
+          {
+            "description": "Parse Nginx logs",
+            "processors": [
+              {
+                "grok": {
+                  "field": "message",
+                  "patterns": [
+                    "%{IPORHOST:client.ip} - %{USER:user.name} \\[%{HTTPDATE:timestamp}\\] \"%{WORD:http.method} %{URIPATHPARAM:url.original} HTTP/%{NUMBER:http.version}\" %{NUMBER:http.response.status_code} %{NUMBER:http.response.bytes}"
+                  ]
+                }
+              },
+              {
+                "date": {
+                  "field": "timestamp",
+                  "formats": ["dd/MMM/yyyy:HH:mm:ss Z"],
+                  "target_field": "@timestamp"
+                }
+              }
+            ]
+          }
+        status_code: 200
+      register: pipeline_result
+      until: pipeline_result.status == 200
+      retries: 5
+      delay: 10

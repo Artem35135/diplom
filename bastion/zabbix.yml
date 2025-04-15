@@ -1,0 +1,99 @@
+---
+- name: Установка Zabbix Server
+  hosts: zabbix
+  become: yes
+  vars:
+    zabbix_version: "6.0"
+    db_root_password: "xAhAVvL7tDiaDy1p9LsJ"
+    db_zabbix_password: "mBdcWH1fC7oJ5Hsc8Mwo"
+
+  tasks:
+    - name: Установка зависимостей
+      apt:
+        name:
+          - wget
+          - gnupg
+        state: present
+        update_cache: yes
+
+    - name: "Add Zabbix repository"
+      apt_repository:
+        repo: "deb http://repo.zabbix.com/zabbix/6.0/ubuntu/ jammy main"
+        state: present
+
+    - name: Обновление APT кэша
+      apt:
+        update_cache: yes
+
+    - name: Установка Zabbix и MariaDB
+      apt:
+        name:
+          - zabbix-server-mysql
+          - zabbix-frontend-php
+          - zabbix-apache-conf
+          - zabbix-sql-scripts
+          - zabbix-agent
+          - mariadb-server
+        state: present
+
+    - name: Запуск и включение MariaDB
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    - name: Установка root-пароля MariaDB (если не установлен)
+      shell: |
+        mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '{{ db_root_password }}';" || true
+      args:
+        executable: /bin/bash
+
+    - name: Создание БД Zabbix с нужной кодировкой
+      mysql_db:
+        name: zabbix
+        encoding: utf8mb4
+        collation: utf8mb4_bin
+        state: present
+        login_user: root
+        login_password: "{{ db_root_password }}"
+
+    - name: Создание пользователя Zabbix (если не существует)
+      mysql_user:
+        name: zabbix
+        password: "{{ db_zabbix_password }}"
+        host: localhost
+        priv: "zabbix.*:ALL"
+        state: present
+        login_user: root
+        login_password: "{{ db_root_password }}"
+
+    - name: Импорт схемы Zabbix
+      shell: |
+        zcat /usr/share/zabbix-sql-scripts/mysql/server.sql.gz | mysql -uzabbix -p'{{ db_zabbix_password }}' zabbix
+      args:
+        executable: /bin/bash
+        creates: /var/lib/mysql/.zabbix_schema_imported
+
+    - name: Настройка пароля БД в конфиге Zabbix
+      lineinfile:
+        path: /etc/zabbix/zabbix_server.conf
+        regexp: '^#?DBPassword='
+        line: "DBPassword={{ db_zabbix_password }}"
+
+    - name: Перезапуск и включение сервисов Zabbix
+      systemd:
+        name: "{{ item }}"
+        state: restarted
+        enabled: yes
+      loop:
+        - zabbix-server
+        - zabbix-agent
+        - apache2
+
+    - name: Проверка доступности веб-интерфейса
+      uri:
+        url: http://localhost/zabbix
+        status_code: 200
+        return_content: no
+      register: zabbix_web
+      ignore_errors: yes

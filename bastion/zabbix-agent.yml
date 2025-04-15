@@ -1,0 +1,61 @@
+---
+- name: Install and configure Zabbix Agent
+  hosts: all
+  become: true
+  vars:
+    zabbix_server: "zabbix.ru-central1.internal"
+    zabbix_server_port: "10051"
+    zabbix_agent_hostname: "{{ inventory_hostname }}"
+
+  tasks:
+    - name: Install Zabbix Agent package
+      package:
+        name: zabbix-agent
+        state: present
+
+    - name: Create required directories
+      block:
+        - name: Create log directory
+          file:
+            path: /var/log/zabbix
+            state: directory
+            owner: zabbix
+            group: zabbix
+            mode: '0755'
+
+        - name: Create config directory
+          file:
+            path: /etc/zabbix/zabbix_agentd.d
+            state: directory
+            owner: zabbix
+            group: zabbix
+            mode: '0755'
+
+    - name: Configure Zabbix Agent
+      template:
+        src: zabbix_agentd.conf.j2
+        dest: /etc/zabbix/zabbix_agentd.conf
+        owner: zabbix
+        group: zabbix
+        mode: '0640'
+      notify: restart zabbix-agent
+
+    - name: Ensure log file exists
+      file:
+        path: /var/log/zabbix/zabbix_agentd.log
+        state: touch
+        owner: zabbix
+        group: zabbix
+        mode: '0640'
+
+    - name: Ensure Zabbix Agent is running and enabled
+      service:
+        name: zabbix-agent
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart zabbix-agent
+      service:
+        name: zabbix-agent
+        state: restarted
