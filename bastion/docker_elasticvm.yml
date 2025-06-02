@@ -4,7 +4,7 @@
   become: true
   vars:
     docker_users:
-      - "{{ ansible_user }}"
+      - "{{ ansible_user_id }}"
 
   tasks:
     - name: Update apt package index
