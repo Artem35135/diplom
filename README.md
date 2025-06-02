@@ -127,4 +127,11 @@ https://github.com/Artem35135/diplom/blob/main/bastion/zabbix-agent.yml
 Сайт http://158.160.181.26/
 
 Скриншоты zabbix
+https://github.com/Artem35135/diplom/blob/main/screenshots/zabbix_dashboard.jpg
+https://github.com/Artem35135/diplom/blob/main/screenshots/zabbix_hosts.jpg
 
+Скриншот kibana
+https://github.com/Artem35135/diplom/blob/main/screenshots/kibana_dashboard.jpg
+
+Снимки дисков
+https://github.com/Artem35135/diplom/blob/main/screenshots/%D1%81%D0%BD%D0%B8%D0%BC%D0%BA%D0%B8%20%D0%B4%D0%B8%D1%81%D0%BA%D0%BE%D0%B2.jpg
